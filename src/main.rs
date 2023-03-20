@@ -1,9 +1,8 @@
 use std::io;
 
 mod ast;
-mod eval;
-mod lexer;
-mod object;
+// mod eval;
+// mod object;
 mod parser;
 mod repl;
 mod token;

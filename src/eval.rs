@@ -98,7 +98,7 @@ impl Evaluator {
 
 #[cfg(test)]
 mod test {
-    use crate::{eval::eval_statements, lexer::Lexer, object::Object, parser::get_ast};
+    use crate::{eval::eval_statements, object::Object, parser::get_ast};
 
     #[test]
     fn test_eval_integer_expression() {

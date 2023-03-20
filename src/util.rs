@@ -17,6 +17,18 @@ pub trait Parser<'a, T> {
         })
     }
 
+    fn to<NewOutput>(self, out: NewOutput) -> BoxedParser<'a, NewOutput>
+    where
+        Self: Sized + 'a,
+        T: 'a,
+        NewOutput: Clone + 'a,
+    {
+        BoxedParser::new(move |input| {
+            self.parse(input)
+                .map(|(_, next_input)| (out.clone(), next_input))
+        })
+    }
+
     fn pred<F>(self, pred_fn: F) -> BoxedParser<'a, T>
     where
         Self: Sized + 'a,
@@ -33,15 +45,31 @@ pub trait Parser<'a, T> {
         })
     }
 
-    fn repeated(self) -> BoxedParser<'a, T>
+    fn repeated(self) -> BoxedParser<'a, Vec<T>>
     where
         Self: Sized + 'a,
         T: 'a,
     {
         BoxedParser::new(move |input| {
-            let result = self.parse(input)?;
-            while let Ok(result) = self.parse(input) {}
-            Ok(result)
+            let mut items = Vec::new();
+            let (item, mut rest) = self.parse(input)?;
+            items.push(item);
+            while let Ok((item, new_rest)) = self.parse(rest) {
+                rest = new_rest;
+                items.push(item)
+            }
+            Ok((items, rest))
+        })
+    }
+
+    fn optional(self) -> BoxedParser<'a, Option<T>>
+    where
+        Self: Sized + 'a,
+        T: 'a,
+    {
+        BoxedParser::new(move |input| match self.parse(input) {
+            Ok((val, rest)) => Ok((Some(val), rest)),
+            Err(_) => Ok((None, input)),
         })
     }
 
@@ -59,9 +87,37 @@ pub trait Parser<'a, T> {
             },
         })
     }
+
+    fn ignore_then<P2, T2>(self, other: P2) -> BoxedParser<'a, T2>
+    where
+        Self: Sized + 'a,
+        T: 'a,
+        T2: 'a,
+        P2: Parser<'a, T2> + 'a,
+    {
+        BoxedParser::new(move |input| {
+            let (_, input) = self.parse(input)?;
+            let (val, input) = other.parse(input)?;
+            Ok((val, input))
+        })
+    }
+
+    fn then_ignore<P2, T2>(self, other: P2) -> BoxedParser<'a, T>
+    where
+        Self: Sized + 'a,
+        T: 'a,
+        T2: 'a,
+        P2: Parser<'a, T2> + 'a,
+    {
+        BoxedParser::new(move |input| {
+            let (val, input) = self.parse(input)?;
+            let (_, input) = other.parse(input)?;
+            Ok((val, input))
+        })
+    }
 }
 
-struct BoxedParser<'a, T> {
+pub struct BoxedParser<'a, T> {
     parser: Box<dyn Parser<'a, T> + 'a>,
 }
 
@@ -100,21 +156,27 @@ pub fn text<'a>(lit: &'a [u8]) -> impl Parser<'a, &[u8]> {
     }
 }
 
-pub fn any_char<'a>() -> impl Parser<'a, &'a u8> {
+pub fn chr<'a>(lit: u8) -> impl Parser<'a, u8> {
     move |input: &'a [u8]| {
-        let char = input.first().ok_or_else(|| eyre!("Unexpected EOF"))?;
+        if !input.starts_with(&[lit]) {
+            return Err(eyre!("Expected {lit:?}"));
+        }
+        Ok((input[0], &input[1..]))
+    }
+}
+
+pub fn any_char<'a>() -> impl Parser<'a, u8> {
+    move |input: &'a [u8]| {
+        let char = *input.first().ok_or_else(|| eyre!("Unexpected EOF"))?;
         Ok((char, &input[1..]))
     }
 }
 
-pub fn char_one_of<'a>(chars: &'a [u8]) -> impl Parser<'a, &u8> {
-    any_char().pred(|c| chars.contains(c))
-}
-
-pub fn ident<'a>() -> impl Parser<'a, &'a u8> {
-    any_char().pred(|c| c.is_ascii_alphabetic()).repeated()
-}
-
-pub fn digit<'a>() -> impl Parser<'a, &'a u8> {
-    any_char().pred(|c| c.is_ascii_digit()).repeated()
+pub fn eof<'a>() -> impl Parser<'a, ()> {
+    move |input: &'a [u8]| {
+        if !input.is_empty() {
+            return Err(eyre!("Expected EOF"));
+        }
+        Ok(((), input))
+    }
 }

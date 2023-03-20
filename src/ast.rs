@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use eyre::eyre;
 
-use crate::token::{Token, TokenType};
+use crate::token::Token;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Statement {
@@ -140,20 +140,20 @@ impl Display for InfixOperator {
     }
 }
 
-impl<'a> TryFrom<Token<'a>> for InfixOperator {
+impl<'a> TryFrom<Token> for InfixOperator {
     type Error = eyre::Report;
 
-    fn try_from(value: Token<'a>) -> Result<Self, Self::Error> {
+    fn try_from(value: Token) -> Result<Self, Self::Error> {
         use InfixOperator::*;
-        Ok(match value.token_type {
-            TokenType::Plus => Plus,
-            TokenType::Minus => Minus,
-            TokenType::Asterisk => Times,
-            TokenType::Slash => DividedBy,
-            TokenType::GT => GreaterThan,
-            TokenType::LT => LessThan,
-            TokenType::Eq => Equals,
-            TokenType::NotEq => NotEquals,
+        Ok(match value {
+            Token::Plus => Plus,
+            Token::Minus => Minus,
+            Token::Asterisk => Times,
+            Token::Slash => DividedBy,
+            Token::GT => GreaterThan,
+            Token::LT => LessThan,
+            Token::Eq => Equals,
+            Token::NotEq => NotEquals,
             _ => return Err(eyre!("[{value}] is not an infix operator")),
         })
     }

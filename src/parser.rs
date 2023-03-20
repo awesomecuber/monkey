@@ -3,15 +3,16 @@ use std::str;
 
 use crate::{
     ast::{Expression, InfixOperator, PrefixOperator, Statement},
-    lexer::Lexer,
-    token::{Token, TokenType},
+    token::Token,
 };
 
 use color_eyre::Result;
 use eyre::{eyre, Context};
 
-pub fn get_ast(l: Lexer) -> (Vec<Statement>, Vec<color_eyre::Report>) {
-    let mut parser = Parser { l: l.peekable() };
+pub fn get_ast(tokens: Vec<Token>) -> (Vec<Statement>, Vec<color_eyre::Report>) {
+    let mut parser = Parser {
+        l: (Box::new(tokens.into_iter()) as Box<dyn Iterator<Item = Token>>).peekable(),
+    };
     let mut statements = vec![];
     let mut errors = vec![];
     while let Some(&first_token) = parser.l.peek() {
@@ -26,17 +27,17 @@ pub fn get_ast(l: Lexer) -> (Vec<Statement>, Vec<color_eyre::Report>) {
     (statements, errors)
 }
 
-struct Parser<'a> {
-    l: Peekable<Lexer<'a>>,
+struct Parser {
+    l: Peekable<Box<dyn Iterator<Item = Token>>>,
 }
 
-impl<'a> Parser<'a> {
-    fn parse_statement(&mut self, first: Token<'a>) -> Result<Statement> {
-        match first.token_type {
-            TokenType::Let => self
+impl Parser {
+    fn parse_statement(&mut self, first: Token) -> Result<Statement> {
+        match first {
+            Token::Let => self
                 .parse_let_statement()
                 .context("Failed to parse let statement"),
-            TokenType::Return => self
+            Token::Return => self
                 .parse_return_statement()
                 .context("Failed to parse return statement"),
             _ => self
