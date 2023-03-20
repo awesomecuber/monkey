@@ -1,9 +1,24 @@
-use crate::token::Token;
+use crate::{
+    token::Token,
+    util::{char_one_of, digit, ident, one_of, text, Parser},
+};
 
 pub struct Lexer<'a> {
     input: &'a [u8],
     anchor: usize,
     position: usize,
+}
+
+fn token<'a>() -> impl Parser<'a, Token<'a>> {
+    text(b"==")
+        .or(text(b"!="))
+        .or(char_one_of(b"+-*/<>,;(){}=!").map(|c| ))
+        .or(ident())
+        .or(digit())
+        .map(|l| Token {
+            token_type: l.into(),
+            literal: l,
+        })
 }
 
 impl<'a> Iterator for Lexer<'a> {
